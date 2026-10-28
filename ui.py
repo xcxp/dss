@@ -98,7 +98,7 @@ class ResultsView(discord.ui.View):
         self.page = 0
         self.pages = max(1, math.ceil(len(rows) / config.PAGE_SIZE))
         self.message = None
-        if ephemeral or source_message is None and False:
+        if ephemeral:
             self.remove_item(self.trash_btn)
         self._sync()
 
