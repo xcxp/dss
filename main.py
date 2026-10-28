@@ -324,6 +324,32 @@ class SearchBot(discord.Client):
         return await self.db.browse(guild.id, allowed, mode, 8, offset, now.strftime("%m-%d"), start_today)
 
     async def handle_search_message(self, msg: discord.Message):
+        text = msg.content.strip()
+
+        # พิมพ์ "/คำสั่ง" เป็นตัวหนังสือธรรมดา (Discord ไม่ได้ส่งเป็น slash command)
+        if text.startswith("/"):
+            await msg.reply(
+                "ข้อความนี้ถูกส่งเป็นตัวหนังสือธรรมดา ไม่ได้เรียก slash command\n"
+                "พิมพ์ `/` แล้ว **คลิกเลือกคำสั่งจากรายการที่เด้งขึ้นมา** ก่อนกด Enter\n"
+                "ถ้าไม่มีคำสั่งของบอทขึ้นเลย ให้พิมพ์ `!panel` ในห้องนี้แทน (เฉพาะคนที่มีสิทธิ์ Manage Server)",
+                mention_author=False, delete_after=60)
+            return
+
+        # ทางลัดสร้างแผงปุ่ม โดยไม่ต้องพึ่ง slash command
+        if text.lower() in ("!panel", "!แผง"):
+            if isinstance(msg.author, discord.Member) and msg.author.guild_permissions.manage_guild:
+                panel = await msg.channel.send(embed=ui.panel_embed(), view=ui.PanelView(self))
+                try:
+                    await panel.pin()
+                except discord.HTTPException:
+                    pass
+                try:
+                    await msg.delete()
+                except discord.HTTPException:
+                    pass
+            else:
+                await msg.reply("ต้องมีสิทธิ์ Manage Server", mention_author=False, delete_after=15)
+            return
         q = parse_query(msg.content)
         if not q.has_criteria() and not q.errors:
             await msg.reply(embed=ui.help_embed(), mention_author=False, delete_after=90)
