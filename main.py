@@ -62,19 +62,14 @@ def check_environment():
             warnings.append(message)
 
     # Check internet connection (only on posix systems)
+    # NOTE: ICMP ping is blocked on most PaaS (Render, Heroku, Fly), so use a TCP
+    # handshake instead and never exit() here - a false negative kills the deploy.
     if os.name == 'posix':
+        import socket
         try:
-            import subprocess
-            subprocess.run(
-                ["ping", "-c", "1", "8.8.8.8"],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=2  # Add timeout to prevent hanging
-            )
-        except (subprocess.SubprocessError, FileNotFoundError):
+            socket.create_connection(("discord.com", 443), timeout=5).close()
+        except OSError:
             warnings.append("No internet connection detected. DeepSearch cannot connect to Discord.")
-            exit()  # Exit if no internet connection
 
     return warnings
 
@@ -2305,6 +2300,47 @@ async def list_cache(ctx):
 
     await ctx.send(embed=embed)
 
+
+# --- Render keep-alive web server ---
+# Render Web Services require the process to bind to $PORT, otherwise the deploy
+# is killed with "No open ports detected" and the service restarts in a loop.
+def start_health_server():
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    port = int(os.environ.get("PORT", "10000"))
+
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = b"Super Search Bot is running"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_HEAD(self):
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, format, *args):
+            pass  # Keep the Render log clean
+
+    try:
+        server = ThreadingHTTPServer(("0.0.0.0", port), HealthHandler)
+    except OSError as e:
+        print(f"⚠️ Could not start health server on port {port}: {e}")
+        return
+
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    print(f"🌐 Health server listening on 0.0.0.0:{port}")
+
+
+if not TOKEN:
+    print("❌ BOT_TOKEN is missing. Set it in Render → Environment → BOT_TOKEN (or in .env locally).")
+    sys.exit(1)
+
+start_health_server()
 
 try:
     bot.run(TOKEN)
