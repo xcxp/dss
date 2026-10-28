@@ -1,0 +1,6 @@
+logs/
+.idea/
+.venv/
+.env
+exports/
+search_stats.json
