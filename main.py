@@ -149,7 +149,10 @@ def setup_logging():
 
 
 # --- Init bot ---
-intents = discord.Intents.all()
+# Only the intents this bot actually uses. Intents.all() also requests the
+# privileged Presence Intent (never used here) and makes login fail unless it
+# is enabled in the Developer Portal as well.
+intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
@@ -2346,5 +2349,9 @@ try:
     bot.run(TOKEN)
 except discord.LoginFailure:
     print("Error: Invalid token. Please check your .env file.")
+except discord.PrivilegedIntentsRequired:
+    print("❌ Privileged Intents not enabled. Go to https://discord.com/developers/applications"
+          " -> your app -> Bot -> Privileged Gateway Intents, enable SERVER MEMBERS INTENT"
+          " and MESSAGE CONTENT INTENT, then restart.")
 except Exception as e:
     print(f"Error starting bot: {e}")
